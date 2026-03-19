@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { GameSession, GameType, Player } from '@/types/game';
+import { GameSession, GameType, Player, GAME_INFO } from '@/types/game';
 
 interface GameContextType {
   session: GameSession | null;
@@ -53,10 +53,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const addBot = useCallback((name: string) => {
     setSession(prev => {
-      if (!prev || prev.players.length >= 4) return prev;
-      const color = (prev.players.length + 1) as 1 | 2 | 3 | 4;
+      if (!prev) return prev;
+      const color = ((prev.players.length % 4) + 1) as 1 | 2 | 3 | 4;
       const bot: Player = { id: `bot${nextId++}`, name, color, isHost: false };
-      return { ...prev, players: [...prev.players, bot] };
+      const newPlayers = [...prev.players, bot];
+      // Auto-deselect game if it can't support this many players
+      let selectedGame = prev.selectedGame;
+      if (selectedGame) {
+        const info = GAME_INFO[selectedGame];
+        if (info.maxPlayers !== null && newPlayers.length > info.maxPlayers) {
+          selectedGame = null;
+        }
+      }
+      return { ...prev, players: newPlayers, selectedGame };
     });
   }, []);
 

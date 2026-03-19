@@ -46,7 +46,7 @@ export function shuffleDeck(deck: Card[]): Card[] {
   return shuffled;
 }
 
-export const GAME_INFO: Record<GameType, { name: string; description: string; minPlayers: number; maxPlayers: number; icon: string }> = {
+export const GAME_INFO: Record<GameType, { name: string; description: string; minPlayers: number; maxPlayers: number | null; icon: string }> = {
   'court-piece': {
     name: 'Court Piece',
     description: 'Classic trick-taking card game for 4 players in partnerships',
@@ -58,14 +58,14 @@ export const GAME_INFO: Record<GameType, { name: string; description: string; mi
     name: 'Crazy Eights',
     description: 'Match cards by rank or suit — 8s are wild!',
     minPlayers: 2,
-    maxPlayers: 4,
+    maxPlayers: null,
     icon: '🃏',
   },
   'chutes-ladders': {
     name: 'Chutes & Ladders',
     description: 'Race to square 100 — watch out for chutes!',
     minPlayers: 2,
-    maxPlayers: 4,
+    maxPlayers: null,
     icon: '🪜',
   },
   'ludo': {
