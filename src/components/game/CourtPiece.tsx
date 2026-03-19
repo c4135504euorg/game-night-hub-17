@@ -116,7 +116,7 @@ export default function CourtPiece() {
         newCount[team]++;
 
         let msg = `${session?.players[trickWinner]?.name} wins the trick! (${newCount[0]}-${newCount[1]})`;
-        let phase = prev.phase;
+        let phase: CourtPieceState['phase'] = prev.phase;
         let winnerName = prev.winner;
         const sirs: [number, number] = [...prev.sirs];
 
