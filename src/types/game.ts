@@ -65,7 +65,7 @@ export const GAME_INFO: Record<GameType, { name: string; description: string; mi
     name: 'Chutes & Ladders',
     description: 'Race to square 100 — watch out for chutes!',
     minPlayers: 2,
-    maxPlayers: 4,
+    maxPlayers: null,
     icon: '🪜',
   },
   'ludo': {
