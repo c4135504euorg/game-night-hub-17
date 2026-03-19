@@ -60,7 +60,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // Auto-deselect game if it can't support this many players
       let selectedGame = prev.selectedGame;
       if (selectedGame) {
-        const { GAME_INFO } = require('@/types/game');
         const info = GAME_INFO[selectedGame];
         if (info.maxPlayers !== null && newPlayers.length > info.maxPlayers) {
           selectedGame = null;
