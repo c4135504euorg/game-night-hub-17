@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { GameSession, GameType, Player } from '@/types/game';
+import { GameSession, GameType, Player, GAME_INFO } from '@/types/game';
 
 interface GameContextType {
   session: GameSession | null;
