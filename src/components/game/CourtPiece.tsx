@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { useGame } from '@/context/GameContext';
 import { Card, createDeck, shuffleDeck, Suit, SUITS } from '@/types/game';
-import PlayingCard from './PlayingCard';
+import PlayingCard, { sortHand } from './PlayingCard';
 import { Button } from '@/components/ui/button';
 
 interface CourtPieceState {
