@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { useGame } from '@/context/GameContext';
 import { Card, createDeck, shuffleDeck, Suit, SUITS } from '@/types/game';
-import PlayingCard from './PlayingCard';
+import PlayingCard, { sortHand } from './PlayingCard';
 import { Button } from '@/components/ui/button';
 
 interface CourtPieceState {
@@ -181,7 +181,7 @@ export default function CourtPiece() {
   }
 
   const cp = state.currentPlayer;
-  const currentHand = state.hands[cp] ?? [];
+  const currentHand = sortHand(state.hands[cp] ?? []);
 
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col">
@@ -257,11 +257,12 @@ export default function CourtPiece() {
         <div className="flex flex-wrap justify-center gap-1 md:gap-2 pb-2">
           {currentHand.map((card, i) => {
             const mustFollowSuit = state.leadSuit && card.suit !== state.leadSuit && currentHand.some(c => c.suit === state.leadSuit);
+            const actualIdx = state.hands[cp].findIndex(c => c.rank === card.rank && c.suit === card.suit);
             return (
               <PlayingCard
                 key={`${card.rank}-${card.suit}-${i}`}
                 card={card}
-                onClick={() => playCard(i)}
+                onClick={() => playCard(actualIdx)}
                 disabled={state.phase !== 'playing' || !!state.winner || !!mustFollowSuit}
                 small={currentHand.length > 10}
               />

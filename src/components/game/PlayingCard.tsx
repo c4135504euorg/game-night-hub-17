@@ -9,17 +9,32 @@ const SUIT_SYMBOLS: Record<string, string> = {
 };
 
 const SUIT_COLORS: Record<string, string> = {
-  hearts: 'text-red-500',
-  diamonds: 'text-red-500',
-  clubs: 'text-foreground',
-  spades: 'text-foreground',
+  hearts: 'text-red-600',
+  diamonds: 'text-red-600',
+  clubs: 'text-gray-900',
+  spades: 'text-gray-900',
 };
 
-const SUIT_BG: Record<string, string> = {
-  hearts: 'text-red-500/20',
-  diamonds: 'text-red-500/20',
-  clubs: 'text-foreground/20',
-  spades: 'text-foreground/20',
+function rankToNumber(rank: string): number {
+  const map: Record<string, number> = {
+    'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
+    '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13,
+  };
+  return map[rank] ?? 0;
+}
+
+// Pip positions for each count (as [row%, col%] in the card center area)
+const PIP_LAYOUTS: Record<number, [number, number][]> = {
+  1: [[50, 50]],
+  2: [[25, 50], [75, 50]],
+  3: [[25, 50], [50, 50], [75, 50]],
+  4: [[25, 30], [25, 70], [75, 30], [75, 70]],
+  5: [[25, 30], [25, 70], [50, 50], [75, 30], [75, 70]],
+  6: [[25, 30], [25, 70], [50, 30], [50, 70], [75, 30], [75, 70]],
+  7: [[20, 30], [20, 70], [40, 50], [50, 30], [50, 70], [75, 30], [75, 70]],
+  8: [[20, 30], [20, 70], [35, 50], [50, 30], [50, 70], [65, 50], [80, 30], [80, 70]],
+  9: [[18, 30], [18, 70], [38, 30], [38, 70], [50, 50], [62, 30], [62, 70], [82, 30], [82, 70]],
+  10: [[15, 30], [15, 70], [33, 30], [33, 70], [25, 50], [50, 30], [50, 70], [67, 30], [67, 70], [85, 50]],
 };
 
 interface Props {
@@ -42,38 +57,77 @@ export default function PlayingCard({ card, onClick, disabled, selected, faceDow
     );
   }
 
+  const num = rankToNumber(card.rank);
+  const symbol = SUIT_SYMBOLS[card.suit];
+  const colorClass = SUIT_COLORS[card.suit];
+  const isFace = num >= 11;
+  const faceLabel = num === 11 ? 'J' : num === 12 ? 'Q' : num === 13 ? 'K' : '';
+  const pipCount = isFace ? 0 : num;
+  const pips = PIP_LAYOUTS[pipCount] ?? [];
+
   return (
     <motion.button
       whileHover={!disabled ? { y: -8 } : undefined}
       whileTap={!disabled ? { scale: 0.95 } : undefined}
       onClick={onClick}
       disabled={disabled}
-      className={`${w} rounded-lg bg-white border-2 border-gray-200 flex flex-col items-start justify-between p-1.5 cursor-pointer select-none transition-all relative overflow-hidden ${
+      className={`${w} rounded-lg bg-white border-2 border-gray-200 flex flex-col items-start justify-between p-1 cursor-pointer select-none transition-all relative overflow-hidden ${
         selected ? 'ring-2 ring-primary -translate-y-2' : ''
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
+      } ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-lg'}`}
     >
       {/* Top left rank + suit */}
-      <div className="flex flex-col items-center leading-none">
-        <span className={`text-xs md:text-sm font-bold ${SUIT_COLORS[card.suit]}`}>
+      <div className="flex flex-col items-center leading-none z-10">
+        <span className={`text-[9px] md:text-xs font-bold ${colorClass}`}>
           {card.rank}
         </span>
-        <span className={`text-xs md:text-sm ${SUIT_COLORS[card.suit]}`}>
-          {SUIT_SYMBOLS[card.suit]}
+        <span className={`text-[9px] md:text-xs ${colorClass}`}>
+          {symbol}
         </span>
       </div>
-      {/* Center suit large */}
-      <span className={`absolute inset-0 flex items-center justify-center text-2xl md:text-3xl ${SUIT_COLORS[card.suit]} opacity-30`}>
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
+
+      {/* Center area with pips or face letter */}
+      <div className="absolute inset-0 top-[18%] bottom-[18%] left-[8%] right-[8%]">
+        {isFace ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className={`text-xl md:text-2xl font-bold ${colorClass}`}>{faceLabel}</span>
+            <span className={`text-lg md:text-xl ${colorClass} ml-0.5`}>{symbol}</span>
+          </div>
+        ) : (
+          pips.map(([top, left], i) => (
+            <span
+              key={i}
+              className={`absolute text-[8px] md:text-[11px] ${colorClass}`}
+              style={{
+                top: `${top}%`,
+                left: `${left}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              {symbol}
+            </span>
+          ))
+        )}
+      </div>
+
       {/* Bottom right rank + suit (inverted) */}
-      <div className="flex flex-col items-center leading-none self-end rotate-180">
-        <span className={`text-xs md:text-sm font-bold ${SUIT_COLORS[card.suit]}`}>
+      <div className="flex flex-col items-center leading-none self-end rotate-180 z-10">
+        <span className={`text-[9px] md:text-xs font-bold ${colorClass}`}>
           {card.rank}
         </span>
-        <span className={`text-xs md:text-sm ${SUIT_COLORS[card.suit]}`}>
-          {SUIT_SYMBOLS[card.suit]}
+        <span className={`text-[9px] md:text-xs ${colorClass}`}>
+          {symbol}
         </span>
       </div>
     </motion.button>
   );
+}
+
+// Sort cards by suit then by rank value
+export function sortHand(cards: Card[]): Card[] {
+  const SUIT_ORDER: Record<string, number> = { spades: 0, hearts: 1, clubs: 2, diamonds: 3 };
+  return [...cards].sort((a, b) => {
+    const suitDiff = (SUIT_ORDER[a.suit] ?? 0) - (SUIT_ORDER[b.suit] ?? 0);
+    if (suitDiff !== 0) return suitDiff;
+    return rankToNumber(a.rank) - rankToNumber(b.rank);
+  });
 }

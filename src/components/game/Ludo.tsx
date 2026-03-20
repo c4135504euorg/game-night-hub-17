@@ -149,21 +149,21 @@ function buildBoard(): Cell[][] {
   // Center home
   board[7][7] = { type: 'home-center' };
 
-  // Home bases (yards) - 6x6 corners
-  // Blue: top-left (rows 0-5, cols 0-5)
-  for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) {
+  // Home bases (yards) - 2x2 corners with padding
+  // Blue: top-left
+  for (let r = 1; r < 5; r++) for (let c = 1; c < 5; c++) {
     if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 0 };
   }
-  // Red: top-right (rows 0-5, cols 9-14)
-  for (let r = 0; r < 6; r++) for (let c = 9; c < 15; c++) {
+  // Red: top-right
+  for (let r = 1; r < 5; r++) for (let c = 10; c < 14; c++) {
     if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 1 };
   }
-  // Yellow: bottom-right (rows 9-14, cols 9-14)
-  for (let r = 9; r < 15; r++) for (let c = 9; c < 15; c++) {
+  // Yellow: bottom-right
+  for (let r = 10; r < 14; r++) for (let c = 10; c < 14; c++) {
     if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 2 };
   }
-  // Green: bottom-left (rows 9-14, cols 0-5)
-  for (let r = 9; r < 15; r++) for (let c = 0; c < 6; c++) {
+  // Green: bottom-left
+  for (let r = 10; r < 14; r++) for (let c = 1; c < 5; c++) {
     if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 3 };
   }
 
@@ -199,10 +199,10 @@ function getHomeStretchCoords(player: number, hsIndex: number): [number, number]
 
 // Yard positions within home base
 const YARD_POSITIONS: Record<number, [number, number][]> = {
-  0: [[1, 1], [1, 4], [4, 1], [4, 4]],       // Blue top-left
-  1: [[1, 10], [1, 13], [4, 10], [4, 13]],    // Red top-right
-  2: [[10, 10], [10, 13], [13, 10], [13, 13]], // Yellow bottom-right
-  3: [[10, 1], [10, 4], [13, 1], [13, 4]],     // Green bottom-left
+  0: [[2, 2], [2, 3], [3, 2], [3, 3]],       // Blue top-left
+  1: [[2, 11], [2, 12], [3, 11], [3, 12]],    // Red top-right
+  2: [[11, 11], [11, 12], [12, 11], [12, 12]], // Yellow bottom-right
+  3: [[11, 2], [11, 3], [12, 2], [12, 3]],     // Green bottom-left
 };
 
 export default function Ludo() {

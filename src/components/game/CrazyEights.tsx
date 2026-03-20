@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { useGame } from '@/context/GameContext';
 import { Card, createDeck, shuffleDeck, Suit, SUITS } from '@/types/game';
-import PlayingCard from './PlayingCard';
+import PlayingCard, { sortHand } from './PlayingCard';
 import { Button } from '@/components/ui/button';
 
 interface GameState {
@@ -139,7 +139,7 @@ export default function CrazyEights() {
   if (!state || !session) return null;
 
   const topCard = state.discardPile[state.discardPile.length - 1];
-  const currentHand = state.hands[state.currentPlayer] ?? [];
+  const currentHand = sortHand(state.hands[state.currentPlayer] ?? []);
   const currentName = session.players[state.currentPlayer]?.name ?? 'Player';
 
   return (
@@ -234,15 +234,32 @@ export default function CrazyEights() {
           {currentName}'s Hand ({currentHand.length} cards)
         </p>
         <div className="flex flex-wrap justify-center gap-1 md:gap-2 max-w-full overflow-x-auto pb-2">
-          {currentHand.map((card, i) => (
-            <PlayingCard
-              key={`${card.rank}-${card.suit}-${i}`}
-              card={card}
-              onClick={() => playCard(i)}
-              disabled={state.winner !== null || state.choosingSuit || !canPlay(card, topCard, chosenSuit)}
-              small={currentHand.length > 10}
-            />
-          ))}
+          {currentHand.map((card, i) => {
+            // Find the index in the original unsorted hand
+            const origHand = state.hands[state.currentPlayer];
+            const usedIndices = new Set<number>();
+            // Map sorted cards to original indices
+            let actualIdx = -1;
+            for (const [si, sortedCard] of currentHand.entries()) {
+              for (let oi = 0; oi < origHand.length; oi++) {
+                if (!usedIndices.has(oi) && origHand[oi].rank === sortedCard.rank && origHand[oi].suit === sortedCard.suit) {
+                  usedIndices.add(oi);
+                  if (si === i) actualIdx = oi;
+                  break;
+                }
+              }
+              if (actualIdx !== -1) break;
+            }
+            return (
+              <PlayingCard
+                key={`${card.rank}-${card.suit}-${i}`}
+                card={card}
+                onClick={() => playCard(actualIdx)}
+                disabled={state.winner !== null || state.choosingSuit || !canPlay(card, topCard, chosenSuit)}
+                small={currentHand.length > 10}
+              />
+            );
+          })}
         </div>
       </div>
 
