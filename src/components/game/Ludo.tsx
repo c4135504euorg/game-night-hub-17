@@ -6,26 +6,31 @@ import Dice from './Dice';
 import { Button } from '@/components/ui/button';
 
 const PLAYER_COLORS_CSS = [
-  'hsl(160, 80%, 45%)',
-  'hsl(280, 70%, 60%)',
-  'hsl(35, 90%, 55%)',
-  'hsl(350, 75%, 58%)',
+  'hsl(220, 75%, 55%)',   // Blue
+  'hsl(0, 72%, 55%)',     // Red
+  'hsl(50, 90%, 50%)',    // Yellow
+  'hsl(140, 70%, 42%)',   // Green
 ];
-const PLAYER_BG = ['bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4'];
-const PLAYER_LABELS = ['Green', 'Purple', 'Orange', 'Red'];
+const PLAYER_BG = ['bg-blue-500', 'bg-red-500', 'bg-yellow-400', 'bg-green-500'];
+const PLAYER_LABELS = ['Blue', 'Red', 'Yellow', 'Green'];
+const PLAYER_BG_LIGHT = [
+  'hsl(220, 75%, 85%)',
+  'hsl(0, 72%, 85%)',
+  'hsl(50, 90%, 85%)',
+  'hsl(140, 70%, 82%)',
+];
 
-// Simplified Ludo: Each player has 4 pieces, track is 52 squares
 const TRACK_LENGTH = 52;
-const HOME_STRETCH = 6; // 6 squares to reach home
-const START_POSITIONS = [0, 13, 26, 39]; // Where each player enters the track
+const HOME_STRETCH = 6;
+const START_POSITIONS = [0, 13, 26, 39];
 
 interface Piece {
   state: 'yard' | 'track' | 'home-stretch' | 'home';
-  trackPos: number; // 0-51 for track, 0-5 for home-stretch
+  trackPos: number;
 }
 
 interface LudoState {
-  pieces: Piece[][]; // [player][piece]
+  pieces: Piece[][];
   currentPlayer: number;
   diceValue: number;
   rolled: boolean;
@@ -46,6 +51,160 @@ function createInitialState(playerCount: number): LudoState {
   };
 }
 
+// Board layout: 15x15 grid
+// The cross-shaped path and home bases
+type CellType = 'empty' | 'path' | 'home-base' | 'home-stretch' | 'home-center' | 'start' | 'safe';
+
+interface Cell {
+  type: CellType;
+  player?: number; // for home-base, home-stretch, start
+  trackIndex?: number; // for path cells
+  homeStretchIndex?: number; // for home-stretch cells
+}
+
+function buildBoard(): Cell[][] {
+  const board: Cell[][] = Array.from({ length: 15 }, () =>
+    Array.from({ length: 15 }, () => ({ type: 'empty' as CellType }))
+  );
+
+  // Track positions mapped to grid coordinates (clockwise from top-left)
+  // The track goes around the cross shape
+  const trackCoords: [number, number][] = [
+    // Top column going down (left side) - cols 6, rows 0-5
+    [0, 6], [1, 6], [2, 6], [3, 6], [4, 6], [5, 6],
+    // Top-right going right - row 6, cols 0-5
+    // Wait, let me think about standard Ludo layout
+    // Standard: the cross has 4 arms, each 3 wide, 6 long
+  ];
+
+  // Let me use a simpler approach - define the path explicitly
+  // The outer track in a standard 15x15 Ludo board:
+  const pathCells: [number, number, number][] = []; // [row, col, trackIndex]
+
+  // Going clockwise starting from blue's entry (top of left arm)
+  // Left arm top row, going right: row 6, cols 0-5
+  const path: [number, number][] = [
+    // Blue start area - going up from row 6
+    [6, 1], [6, 2], [6, 3], [6, 4], [6, 5],
+    // Going up
+    [5, 6], [4, 6], [3, 6], [2, 6], [1, 6], [0, 6],
+    // Top right turn
+    [0, 7], [0, 8],
+    // Going down on right side
+    [1, 8], [2, 8], [3, 8], [4, 8], [5, 8],
+    // Right arm
+    [6, 9], [6, 10], [6, 11], [6, 12], [6, 13], [6, 14],
+    // Bottom right turn
+    [7, 14], [8, 14],
+    // Going left on bottom
+    [8, 13], [8, 12], [8, 11], [8, 10], [8, 9],
+    // Going down
+    [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8],
+    // Bottom left turn
+    [14, 7], [14, 6],
+    // Going up on left
+    [13, 6], [12, 6], [11, 6], [10, 6], [9, 6],
+    // Left arm bottom
+    [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
+    // Top left turn
+    [7, 0], [6, 0],
+  ];
+
+  // Mark path cells
+  path.forEach(([r, c], i) => {
+    board[r][c] = { type: 'path', trackIndex: i };
+  });
+
+  // Mark start positions
+  const startCells: [number, number, number][] = [
+    [6, 1, 0],   // Blue start (track 0)
+    [1, 8, 13],   // Red start (track 13)
+    [8, 13, 26],  // Yellow start (track 26)
+    [13, 6, 39],  // Green start (track 39)
+  ];
+
+  startCells.forEach(([r, c, pi]) => {
+    const playerIdx = START_POSITIONS.indexOf(pi);
+    board[r][c] = { type: 'start', player: playerIdx, trackIndex: pi };
+  });
+
+  // Home stretches (6 cells each, leading to center)
+  const homeStretches: [number, number, number, number][][] = [
+    // Blue: row 7, cols 1-6
+    [[7, 1, 0, 0], [7, 2, 0, 1], [7, 3, 0, 2], [7, 4, 0, 3], [7, 5, 0, 4], [7, 6, 0, 5]],
+    // Red: rows 1-6, col 7
+    [[1, 7, 1, 0], [2, 7, 1, 1], [3, 7, 1, 2], [4, 7, 1, 3], [5, 7, 1, 4], [6, 7, 1, 5]],
+    // Yellow: row 7, cols 13-8
+    [[7, 13, 2, 0], [7, 12, 2, 1], [7, 11, 2, 2], [7, 10, 2, 3], [7, 9, 2, 4], [7, 8, 2, 5]],
+    // Green: rows 13-8, col 7
+    [[13, 7, 3, 0], [12, 7, 3, 1], [11, 7, 3, 2], [10, 7, 3, 3], [9, 7, 3, 4], [8, 7, 3, 5]],
+  ];
+
+  homeStretches.forEach(stretch => {
+    stretch.forEach(([r, c, pi, hi]) => {
+      board[r][c] = { type: 'home-stretch', player: pi, homeStretchIndex: hi };
+    });
+  });
+
+  // Center home
+  board[7][7] = { type: 'home-center' };
+
+  // Home bases (yards) - 6x6 corners
+  // Blue: top-left (rows 0-5, cols 0-5)
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) {
+    if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 0 };
+  }
+  // Red: top-right (rows 0-5, cols 9-14)
+  for (let r = 0; r < 6; r++) for (let c = 9; c < 15; c++) {
+    if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 1 };
+  }
+  // Yellow: bottom-right (rows 9-14, cols 9-14)
+  for (let r = 9; r < 15; r++) for (let c = 9; c < 15; c++) {
+    if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 2 };
+  }
+  // Green: bottom-left (rows 9-14, cols 0-5)
+  for (let r = 9; r < 15; r++) for (let c = 0; c < 6; c++) {
+    if (board[r][c].type === 'empty') board[r][c] = { type: 'home-base', player: 3 };
+  }
+
+  return board;
+}
+
+const BOARD = buildBoard();
+
+// Map track position to grid coords
+function getTrackCoords(trackPos: number): [number, number] | null {
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 15; c++) {
+      const cell = BOARD[r][c];
+      if ((cell.type === 'path' || cell.type === 'start') && cell.trackIndex === trackPos) {
+        return [r, c];
+      }
+    }
+  }
+  return null;
+}
+
+function getHomeStretchCoords(player: number, hsIndex: number): [number, number] | null {
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 15; c++) {
+      const cell = BOARD[r][c];
+      if (cell.type === 'home-stretch' && cell.player === player && cell.homeStretchIndex === hsIndex) {
+        return [r, c];
+      }
+    }
+  }
+  return null;
+}
+
+// Yard positions within home base
+const YARD_POSITIONS: Record<number, [number, number][]> = {
+  0: [[1, 1], [1, 4], [4, 1], [4, 4]],       // Blue top-left
+  1: [[1, 10], [1, 13], [4, 10], [4, 13]],    // Red top-right
+  2: [[10, 10], [10, 13], [13, 10], [13, 13]], // Yellow bottom-right
+  3: [[10, 1], [10, 4], [13, 1], [13, 4]],     // Green bottom-left
+};
+
 export default function Ludo() {
   const { session, resetToLobby } = useGame();
   const playerCount = session?.players.length ?? 2;
@@ -62,8 +221,7 @@ export default function Ludo() {
       setRolling(false);
       const cp = state.currentPlayer;
       const playerPieces = state.pieces[cp];
-      
-      // Check if any move is possible
+
       const canMoveAny = playerPieces.some(p => {
         if (p.state === 'home') return false;
         if (p.state === 'yard') return value === 6;
@@ -94,15 +252,10 @@ export default function Ludo() {
       const newPieces = prev.pieces.map(pp => pp.map(p => ({ ...p })));
 
       if (piece.state === 'yard' && value === 6) {
-        // Enter the track
         newPieces[cp][pieceIdx] = { state: 'track', trackPos: START_POSITIONS[cp] };
       } else if (piece.state === 'track') {
         let newPos = (piece.trackPos + value) % TRACK_LENGTH;
-        // Check if entering home stretch
         const startPos = START_POSITIONS[cp];
-        const homeEntry = (startPos + TRACK_LENGTH - 1) % TRACK_LENGTH;
-        
-        // Simple check: count steps from start
         const stepsFromStart = (piece.trackPos - startPos + TRACK_LENGTH) % TRACK_LENGTH;
         const newSteps = stepsFromStart + value;
 
@@ -112,10 +265,9 @@ export default function Ludo() {
         } else if (newSteps === TRACK_LENGTH - 1 + HOME_STRETCH) {
           newPieces[cp][pieceIdx] = { state: 'home', trackPos: 0 };
         } else if (newSteps > TRACK_LENGTH - 1 + HOME_STRETCH) {
-          return prev; // Can't overshoot
+          return prev;
         } else {
           newPieces[cp][pieceIdx] = { state: 'track', trackPos: newPos };
-          // Capture: send opponent pieces back to yard
           for (let op = 0; op < playerCount; op++) {
             if (op === cp) continue;
             for (let oi = 0; oi < newPieces[op].length; oi++) {
@@ -133,11 +285,10 @@ export default function Ludo() {
         } else if (newPos < HOME_STRETCH) {
           newPieces[cp][pieceIdx] = { state: 'home-stretch', trackPos: newPos };
         } else {
-          return prev; // Can't overshoot
+          return prev;
         }
       }
 
-      // Check win
       const allHome = newPieces[cp].every(p => p.state === 'home');
       if (allHome) {
         setMessage(`${session?.players[cp]?.name} wins! 🎉`);
@@ -164,8 +315,37 @@ export default function Ludo() {
 
   const cp = state.currentPlayer;
 
+  // Collect all piece positions for rendering on the board
+  const piecePositions: { row: number; col: number; player: number; pieceIdx: number }[] = [];
+
+  state.pieces.forEach((playerPieces, pi) => {
+    let yardCount = 0;
+    playerPieces.forEach((piece, idx) => {
+      if (piece.state === 'yard') {
+        const yardPos = YARD_POSITIONS[pi]?.[yardCount];
+        if (yardPos) {
+          piecePositions.push({ row: yardPos[0], col: yardPos[1], player: pi, pieceIdx: idx });
+        }
+        yardCount++;
+      } else if (piece.state === 'track') {
+        const coords = getTrackCoords(piece.trackPos);
+        if (coords) {
+          piecePositions.push({ row: coords[0], col: coords[1], player: pi, pieceIdx: idx });
+        }
+      } else if (piece.state === 'home-stretch') {
+        const coords = getHomeStretchCoords(pi, piece.trackPos);
+        if (coords) {
+          piecePositions.push({ row: coords[0], col: coords[1], player: pi, pieceIdx: idx });
+        }
+      } else if (piece.state === 'home') {
+        // Show in center area
+        piecePositions.push({ row: 7, col: 7, player: pi, pieceIdx: idx });
+      }
+    });
+  });
+
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col">
+    <div className="min-h-screen bg-background p-2 md:p-4 flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <Button variant="ghost" size="sm" onClick={resetToLobby}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Lobby
@@ -176,87 +356,91 @@ export default function Ludo() {
         </Button>
       </div>
 
-      <motion.p key={message} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-sm font-semibold text-primary mb-3">
+      <motion.p key={message} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-sm font-semibold text-primary mb-2">
         {message}
       </motion.p>
 
-      {/* Player yards and pieces overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        {session.players.map((p, pi) => (
-          <div key={p.id} className={`bg-card border rounded-lg p-3 ${pi === cp ? 'border-primary glow-primary' : 'border-border'}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-4 h-4 rounded-full ${PLAYER_BG[pi]}`} />
-              <span className="text-sm font-semibold text-foreground">{p.name}</span>
-            </div>
-            <div className="flex gap-1">
-              {state.pieces[pi].map((piece, i) => (
-                <motion.button
-                  key={i}
-                  whileHover={pi === cp && state.rolled ? { scale: 1.2 } : undefined}
-                  onClick={() => pi === cp && state.rolled ? movePiece(i) : undefined}
-                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
-                    piece.state === 'home' 
-                      ? 'bg-muted border-muted-foreground opacity-40' 
-                      : `${PLAYER_BG[pi]} border-background`
-                  } ${pi === cp && state.rolled && piece.state !== 'home' ? 'cursor-pointer ring-1 ring-primary' : 'cursor-default'}`}
-                  disabled={pi !== cp || !state.rolled || piece.state === 'home'}
-                >
-                  {piece.state === 'yard' ? 'Y' : piece.state === 'home' ? '✓' : piece.state === 'home-stretch' ? `H${piece.trackPos + 1}` : piece.trackPos}
-                </motion.button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Simplified visual board */}
+      {/* Cross-shaped Board */}
       <div className="flex-1 flex items-center justify-center">
-        <div className="relative w-full max-w-md">
-          {/* Track ring visualization */}
-          <svg viewBox="0 0 400 400" className="w-full">
-            {/* Draw track squares */}
-            {Array.from({ length: TRACK_LENGTH }).map((_, i) => {
-              const angle = (i / TRACK_LENGTH) * Math.PI * 2 - Math.PI / 2;
-              const r = 160;
-              const cx = 200 + Math.cos(angle) * r;
-              const cy = 200 + Math.sin(angle) * r;
-              const isStart = START_POSITIONS.includes(i);
-              
-              return (
-                <g key={i}>
-                  <circle
-                    cx={cx} cy={cy} r={10}
-                    fill={isStart ? PLAYER_COLORS_CSS[START_POSITIONS.indexOf(i)] : 'hsl(220, 15%, 20%)'}
-                    stroke="hsl(220, 15%, 30%)"
-                    strokeWidth={1}
-                    opacity={isStart ? 0.8 : 0.5}
-                  />
-                  {/* Render pieces on this position */}
-                  {state.pieces.flatMap((pp, pi) =>
-                    pp.filter(p => p.state === 'track' && p.trackPos === i).map((_, idx) => (
-                      <circle
-                        key={`${pi}-${idx}`}
-                        cx={cx + (idx - 0.5) * 5}
-                        cy={cy - 5}
-                        r={6}
-                        fill={PLAYER_COLORS_CSS[pi]}
-                        stroke="hsl(220, 20%, 10%)"
-                        strokeWidth={2}
-                      />
-                    ))
-                  )}
-                </g>
-              );
-            })}
-            {/* Center home */}
-            <circle cx={200} cy={200} r={40} fill="hsl(220, 18%, 13%)" stroke="hsl(160, 80%, 45%)" strokeWidth={2} />
-            <text x={200} y={205} textAnchor="middle" fill="hsl(210, 20%, 90%)" fontSize={12} fontFamily="Orbitron">HOME</text>
-          </svg>
+        <div className="w-full max-w-md aspect-square relative">
+          <div className="grid grid-rows-[repeat(15,1fr)] grid-cols-[repeat(15,1fr)] w-full h-full gap-[1px] bg-border rounded-lg overflow-hidden">
+            {BOARD.map((row, r) =>
+              row.map((cell, c) => {
+                const piecesHere = piecePositions.filter(p => p.row === r && p.col === c);
+                const isCurrentPlayerPiece = piecesHere.some(p => p.player === cp);
+
+                let bgColor = 'bg-background';
+                let borderStyle = '';
+
+                if (cell.type === 'home-base') {
+                  bgColor = '';
+                  borderStyle = `background-color: ${PLAYER_BG_LIGHT[cell.player ?? 0]}`;
+                } else if (cell.type === 'path') {
+                  bgColor = 'bg-card';
+                } else if (cell.type === 'start') {
+                  bgColor = '';
+                  borderStyle = `background-color: ${PLAYER_COLORS_CSS[cell.player ?? 0]}`;
+                } else if (cell.type === 'home-stretch') {
+                  bgColor = '';
+                  borderStyle = `background-color: ${PLAYER_COLORS_CSS[cell.player ?? 0]}; opacity: 0.6`;
+                } else if (cell.type === 'home-center') {
+                  bgColor = 'bg-card';
+                } else {
+                  bgColor = 'bg-background';
+                }
+
+                return (
+                  <div
+                    key={`${r}-${c}`}
+                    className={`relative flex items-center justify-center ${bgColor} ${cell.type === 'empty' ? '' : 'border-border'}`}
+                    style={borderStyle ? { ...Object.fromEntries(borderStyle.split(';').filter(Boolean).map(s => {
+                      const [k, v] = s.split(':').map(x => x.trim());
+                      return [k.replace(/-([a-z])/g, (_, l) => l.toUpperCase()), v];
+                    })) } : undefined}
+                  >
+                    {cell.type === 'start' && (
+                      <span className="text-[6px] md:text-[8px] font-bold text-primary-foreground">★</span>
+                    )}
+                    {cell.type === 'home-center' && (
+                      <span className="text-[5px] md:text-[7px] font-bold text-foreground">🏠</span>
+                    )}
+                    {/* Render pieces */}
+                    {piecesHere.length > 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center z-10">
+                        {piecesHere.map((p, i) => (
+                          <motion.button
+                            key={`${p.player}-${p.pieceIdx}`}
+                            layout
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            onClick={() => p.player === cp && state.rolled ? movePiece(p.pieceIdx) : undefined}
+                            className={`w-3 h-3 md:w-4 md:h-4 rounded-full border border-background shadow-md ${
+                              p.player === cp && state.rolled ? 'cursor-pointer ring-1 ring-foreground animate-pulse' : 'cursor-default'
+                            }`}
+                            style={{ backgroundColor: PLAYER_COLORS_CSS[p.player], marginLeft: i > 0 ? '-2px' : '0' }}
+                            disabled={p.player !== cp || !state.rolled}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Dice */}
-      <div className="flex justify-center mt-4 pb-4">
+      {/* Player info + Dice */}
+      <div className="flex items-center justify-center gap-4 mt-3 pb-4 flex-wrap">
+        {session.players.map((p, i) => (
+          <div key={p.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${i === cp ? 'ring-1 ring-primary bg-secondary' : ''}`}>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PLAYER_COLORS_CSS[i] }} />
+            <span className="text-foreground">{p.name}</span>
+            <span className="text-muted-foreground">
+              ({state.pieces[i].filter(pc => pc.state === 'home').length}/4)
+            </span>
+          </div>
+        ))}
         <Dice value={state.diceValue} rolling={rolling} onRoll={rollDice} disabled={state.rolled || state.winner !== null} />
       </div>
 

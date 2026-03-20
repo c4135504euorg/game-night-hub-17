@@ -9,10 +9,17 @@ const SUIT_SYMBOLS: Record<string, string> = {
 };
 
 const SUIT_COLORS: Record<string, string> = {
-  hearts: 'text-destructive',
-  diamonds: 'text-destructive',
+  hearts: 'text-red-500',
+  diamonds: 'text-red-500',
   clubs: 'text-foreground',
   spades: 'text-foreground',
+};
+
+const SUIT_BG: Record<string, string> = {
+  hearts: 'text-red-500/20',
+  diamonds: 'text-red-500/20',
+  clubs: 'text-foreground/20',
+  spades: 'text-foreground/20',
 };
 
 interface Props {
@@ -30,7 +37,7 @@ export default function PlayingCard({ card, onClick, disabled, selected, faceDow
   if (faceDown) {
     return (
       <div className={`${w} rounded-lg bg-primary/20 border-2 border-primary/40 flex items-center justify-center`}>
-        <span className="text-primary text-xl">?</span>
+        <span className="text-primary text-xl">🂠</span>
       </div>
     );
   }
@@ -41,16 +48,32 @@ export default function PlayingCard({ card, onClick, disabled, selected, faceDow
       whileTap={!disabled ? { scale: 0.95 } : undefined}
       onClick={onClick}
       disabled={disabled}
-      className={`${w} rounded-lg bg-foreground border-2 flex flex-col items-center justify-center cursor-pointer select-none transition-all ${
+      className={`${w} rounded-lg bg-white border-2 border-gray-200 flex flex-col items-start justify-between p-1.5 cursor-pointer select-none transition-all relative overflow-hidden ${
         selected ? 'ring-2 ring-primary -translate-y-2' : ''
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
     >
-      <span className={`text-xs font-bold ${SUIT_COLORS[card.suit]}`}>
-        {card.rank}
-      </span>
-      <span className={`text-lg ${SUIT_COLORS[card.suit]}`}>
+      {/* Top left rank + suit */}
+      <div className="flex flex-col items-center leading-none">
+        <span className={`text-xs md:text-sm font-bold ${SUIT_COLORS[card.suit]}`}>
+          {card.rank}
+        </span>
+        <span className={`text-xs md:text-sm ${SUIT_COLORS[card.suit]}`}>
+          {SUIT_SYMBOLS[card.suit]}
+        </span>
+      </div>
+      {/* Center suit large */}
+      <span className={`absolute inset-0 flex items-center justify-center text-2xl md:text-3xl ${SUIT_COLORS[card.suit]} opacity-30`}>
         {SUIT_SYMBOLS[card.suit]}
       </span>
+      {/* Bottom right rank + suit (inverted) */}
+      <div className="flex flex-col items-center leading-none self-end rotate-180">
+        <span className={`text-xs md:text-sm font-bold ${SUIT_COLORS[card.suit]}`}>
+          {card.rank}
+        </span>
+        <span className={`text-xs md:text-sm ${SUIT_COLORS[card.suit]}`}>
+          {SUIT_SYMBOLS[card.suit]}
+        </span>
+      </div>
     </motion.button>
   );
 }
