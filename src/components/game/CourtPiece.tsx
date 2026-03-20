@@ -181,7 +181,7 @@ export default function CourtPiece() {
   }
 
   const cp = state.currentPlayer;
-  const currentHand = state.hands[cp] ?? [];
+  const currentHand = sortHand(state.hands[cp] ?? []);
 
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col">
