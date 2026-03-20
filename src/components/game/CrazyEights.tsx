@@ -235,10 +235,21 @@ export default function CrazyEights() {
         </p>
         <div className="flex flex-wrap justify-center gap-1 md:gap-2 max-w-full overflow-x-auto pb-2">
           {currentHand.map((card, i) => {
-            const originalIdx = state.hands[state.currentPlayer].findIndex(
-              (c, ci) => c.rank === card.rank && c.suit === card.suit && !currentHand.slice(0, i).some((prev, pi) => prev.rank === c.rank && prev.suit === c.suit && state.hands[state.currentPlayer].indexOf(c) === ci)
-            );
-            const actualIdx = state.hands[state.currentPlayer].indexOf(card);
+            // Find the index in the original unsorted hand
+            const origHand = state.hands[state.currentPlayer];
+            const usedIndices = new Set<number>();
+            // Map sorted cards to original indices
+            let actualIdx = -1;
+            for (const [si, sortedCard] of currentHand.entries()) {
+              for (let oi = 0; oi < origHand.length; oi++) {
+                if (!usedIndices.has(oi) && origHand[oi].rank === sortedCard.rank && origHand[oi].suit === sortedCard.suit) {
+                  usedIndices.add(oi);
+                  if (si === i) actualIdx = oi;
+                  break;
+                }
+              }
+              if (actualIdx !== -1) break;
+            }
             return (
               <PlayingCard
                 key={`${card.rank}-${card.suit}-${i}`}
