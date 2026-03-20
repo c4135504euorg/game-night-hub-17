@@ -139,7 +139,7 @@ export default function CrazyEights() {
   if (!state || !session) return null;
 
   const topCard = state.discardPile[state.discardPile.length - 1];
-  const currentHand = state.hands[state.currentPlayer] ?? [];
+  const currentHand = sortHand(state.hands[state.currentPlayer] ?? []);
   const currentName = session.players[state.currentPlayer]?.name ?? 'Player';
 
   return (
