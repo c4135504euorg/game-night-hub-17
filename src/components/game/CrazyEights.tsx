@@ -234,15 +234,21 @@ export default function CrazyEights() {
           {currentName}'s Hand ({currentHand.length} cards)
         </p>
         <div className="flex flex-wrap justify-center gap-1 md:gap-2 max-w-full overflow-x-auto pb-2">
-          {currentHand.map((card, i) => (
-            <PlayingCard
-              key={`${card.rank}-${card.suit}-${i}`}
-              card={card}
-              onClick={() => playCard(i)}
-              disabled={state.winner !== null || state.choosingSuit || !canPlay(card, topCard, chosenSuit)}
-              small={currentHand.length > 10}
-            />
-          ))}
+          {currentHand.map((card, i) => {
+            const originalIdx = state.hands[state.currentPlayer].findIndex(
+              (c, ci) => c.rank === card.rank && c.suit === card.suit && !currentHand.slice(0, i).some((prev, pi) => prev.rank === c.rank && prev.suit === c.suit && state.hands[state.currentPlayer].indexOf(c) === ci)
+            );
+            const actualIdx = state.hands[state.currentPlayer].indexOf(card);
+            return (
+              <PlayingCard
+                key={`${card.rank}-${card.suit}-${i}`}
+                card={card}
+                onClick={() => playCard(actualIdx)}
+                disabled={state.winner !== null || state.choosingSuit || !canPlay(card, topCard, chosenSuit)}
+                small={currentHand.length > 10}
+              />
+            );
+          })}
         </div>
       </div>
 

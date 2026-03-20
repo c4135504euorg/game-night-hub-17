@@ -199,10 +199,10 @@ function getHomeStretchCoords(player: number, hsIndex: number): [number, number]
 
 // Yard positions within home base
 const YARD_POSITIONS: Record<number, [number, number][]> = {
-  0: [[1, 1], [1, 4], [4, 1], [4, 4]],       // Blue top-left
-  1: [[1, 10], [1, 13], [4, 10], [4, 13]],    // Red top-right
-  2: [[10, 10], [10, 13], [13, 10], [13, 13]], // Yellow bottom-right
-  3: [[10, 1], [10, 4], [13, 1], [13, 4]],     // Green bottom-left
+  0: [[2, 2], [2, 3], [3, 2], [3, 3]],       // Blue top-left
+  1: [[2, 11], [2, 12], [3, 11], [3, 12]],    // Red top-right
+  2: [[11, 11], [11, 12], [12, 11], [12, 12]], // Yellow bottom-right
+  3: [[11, 2], [11, 3], [12, 2], [12, 3]],     // Green bottom-left
 };
 
 export default function Ludo() {

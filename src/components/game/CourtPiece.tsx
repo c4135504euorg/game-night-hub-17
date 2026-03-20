@@ -257,11 +257,12 @@ export default function CourtPiece() {
         <div className="flex flex-wrap justify-center gap-1 md:gap-2 pb-2">
           {currentHand.map((card, i) => {
             const mustFollowSuit = state.leadSuit && card.suit !== state.leadSuit && currentHand.some(c => c.suit === state.leadSuit);
+            const actualIdx = state.hands[cp].findIndex(c => c.rank === card.rank && c.suit === card.suit);
             return (
               <PlayingCard
                 key={`${card.rank}-${card.suit}-${i}`}
                 card={card}
-                onClick={() => playCard(i)}
+                onClick={() => playCard(actualIdx)}
                 disabled={state.phase !== 'playing' || !!state.winner || !!mustFollowSuit}
                 small={currentHand.length > 10}
               />
