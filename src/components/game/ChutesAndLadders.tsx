@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { useGame } from '@/context/GameContext';
 import Dice from './Dice';
@@ -13,20 +13,77 @@ const LADDERS: Record<number, number> = {
 };
 
 const PLAYER_BG = ['bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4'];
+const PLAYER_COLORS_CSS = [
+  'hsl(160, 80%, 45%)',
+  'hsl(280, 70%, 60%)',
+  'hsl(35, 90%, 55%)',
+  'hsl(350, 75%, 58%)',
+];
+
+// Get row/col from square number (1-100)
+function squareToRowCol(num: number): { row: number; col: number } {
+  const fromBottom = num - 1;
+  const row = 9 - Math.floor(fromBottom / 10);
+  const colInRow = fromBottom % 10;
+  const isEvenRowFromBottom = Math.floor(fromBottom / 10) % 2 === 0;
+  const col = isEvenRowFromBottom ? colInRow : 9 - colInRow;
+  return { row, col };
+}
+
+// Get center position as percentage
+function squareCenter(num: number): { x: number; y: number } {
+  const { row, col } = squareToRowCol(num);
+  return { x: (col + 0.5) * 10, y: (row + 0.5) * 10 };
+}
 
 export default function ChutesAndLadders() {
   const { session, resetToLobby } = useGame();
   const playerCount = session?.players.length ?? 2;
-  
+
   const [positions, setPositions] = useState<number[]>(Array(playerCount).fill(0));
+  const [displayPositions, setDisplayPositions] = useState<number[]>(Array(playerCount).fill(0));
   const [currentPlayer, setCurrentPlayer] = useState(0);
   const [diceValue, setDiceValue] = useState(1);
   const [rolling, setRolling] = useState(false);
+  const [animating, setAnimating] = useState(false);
   const [winner, setWinner] = useState<number | null>(null);
   const [message, setMessage] = useState(`${session?.players[0]?.name}'s turn — Roll the dice!`);
 
+  // Animate piece movement step by step
+  const animateMovement = useCallback((playerIdx: number, from: number, to: number, finalPos: number, onDone: () => void) => {
+    setAnimating(true);
+    const steps: number[] = [];
+
+    if (to > from) {
+      for (let i = from + 1; i <= to; i++) steps.push(i);
+    } else {
+      for (let i = from - 1; i >= to; i--) steps.push(i);
+    }
+
+    // If there's a chute/ladder jump after reaching 'to', add the final position
+    if (finalPos !== to) {
+      steps.push(finalPos);
+    }
+
+    let stepIdx = 0;
+    const interval = setInterval(() => {
+      if (stepIdx < steps.length) {
+        setDisplayPositions(prev => {
+          const next = [...prev];
+          next[playerIdx] = steps[stepIdx];
+          return next;
+        });
+        stepIdx++;
+      } else {
+        clearInterval(interval);
+        setAnimating(false);
+        onDone();
+      }
+    }, 200);
+  }, []);
+
   const rollDice = useCallback(() => {
-    if (rolling || winner !== null) return;
+    if (rolling || winner !== null || animating) return;
     setRolling(true);
     const value = Math.floor(Math.random() * 6) + 1;
 
@@ -34,55 +91,61 @@ export default function ChutesAndLadders() {
       setDiceValue(value);
       setRolling(false);
 
-      setPositions(prev => {
-        const newPos = [...prev];
-        let target = newPos[currentPlayer] + value;
-        
-        if (target > 100) {
-          const next = (currentPlayer + 1) % playerCount;
-          setMessage(`${session?.players[currentPlayer]?.name} rolled ${value} — too high! ${session?.players[next]?.name}'s turn`);
-          setCurrentPlayer(next);
-          return prev;
-        }
+      const currentPos = positions[currentPlayer];
+      let target = currentPos + value;
 
-        if (target === 100) {
-          newPos[currentPlayer] = 100;
-          setWinner(currentPlayer);
-          setMessage(`${session?.players[currentPlayer]?.name} wins! 🎉`);
-          return newPos;
-        }
-
-        // Check chutes and ladders
-        let msg = `${session?.players[currentPlayer]?.name} rolled ${value} → square ${target}`;
-        if (LADDERS[target]) {
-          msg += ` 🪜 Ladder to ${LADDERS[target]}!`;
-          target = LADDERS[target];
-        } else if (CHUTES[target]) {
-          msg += ` 🛝 Chute to ${CHUTES[target]}!`;
-          target = CHUTES[target];
-        }
-
-        if (target === 100) {
-          newPos[currentPlayer] = 100;
-          setWinner(currentPlayer);
-          setMessage(`${session?.players[currentPlayer]?.name} wins! 🎉`);
-          return newPos;
-        }
-
-        newPos[currentPlayer] = target;
+      if (target > 100) {
         const next = (currentPlayer + 1) % playerCount;
-        setMessage(msg);
+        setMessage(`${session?.players[currentPlayer]?.name} rolled ${value} — too high! ${session?.players[next]?.name}'s turn`);
         setCurrentPlayer(next);
-        return newPos;
+        return;
+      }
+
+      let finalTarget = target;
+      let msg = `${session?.players[currentPlayer]?.name} rolled ${value} → square ${target}`;
+
+      if (LADDERS[target]) {
+        msg += ` 🪜 Ladder to ${LADDERS[target]}!`;
+        finalTarget = LADDERS[target];
+      } else if (CHUTES[target]) {
+        msg += ` 🐍 Chute to ${CHUTES[target]}!`;
+        finalTarget = CHUTES[target];
+      }
+
+      if (finalTarget === 100) {
+        setMessage(msg);
+        animateMovement(currentPlayer, currentPos, target, finalTarget, () => {
+          setPositions(prev => {
+            const np = [...prev];
+            np[currentPlayer] = 100;
+            return np;
+          });
+          setWinner(currentPlayer);
+          setMessage(`${session?.players[currentPlayer]?.name} wins! 🎉`);
+        });
+        return;
+      }
+
+      setMessage(msg);
+      animateMovement(currentPlayer, currentPos, target, finalTarget, () => {
+        setPositions(prev => {
+          const np = [...prev];
+          np[currentPlayer] = finalTarget;
+          return np;
+        });
+        const next = (currentPlayer + 1) % playerCount;
+        setCurrentPlayer(next);
       });
     }, 600);
-  }, [rolling, winner, currentPlayer, playerCount, session]);
+  }, [rolling, winner, animating, currentPlayer, playerCount, session, positions, animateMovement]);
 
   const reset = () => {
     setPositions(Array(playerCount).fill(0));
+    setDisplayPositions(Array(playerCount).fill(0));
     setCurrentPlayer(0);
     setDiceValue(1);
     setWinner(null);
+    setAnimating(false);
     setMessage(`${session?.players[0]?.name}'s turn — Roll the dice!`);
   };
 
@@ -119,50 +182,129 @@ export default function ChutesAndLadders() {
 
       {/* Board */}
       <div className="flex-1 flex items-center justify-center">
-        <div className="grid grid-cols-10 gap-0.5 w-full max-w-lg aspect-square">
-          {squares.map((num) => {
-            const isLadderStart = LADDERS[num] !== undefined;
-            const isChuteStart = CHUTES[num] !== undefined;
-            const playersHere = positions.map((pos, i) => i).filter(i => positions[i] === num);
-            
-            return (
-              <div
-                key={num}
-                className={`relative flex items-center justify-center text-[8px] md:text-xs rounded-sm border border-border ${
-                  isLadderStart ? 'bg-primary/20' : isChuteStart ? 'bg-destructive/20' : 'bg-secondary'
-                }`}
-              >
-                <span className="text-muted-foreground">{num}</span>
-                {isLadderStart && <span className="absolute top-0 right-0 text-[6px]">🪜</span>}
-                {isChuteStart && <span className="absolute top-0 right-0 text-[6px]">🛝</span>}
-                {playersHere.length > 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center gap-0.5">
-                    {playersHere.map(pi => (
-                      <motion.div
-                        key={pi}
-                        layoutId={`piece-${pi}`}
-                        className={`w-2.5 h-2.5 md:w-3.5 md:h-3.5 rounded-full ${PLAYER_BG[pi]} border border-background`}
+        <div className="relative w-full max-w-lg aspect-square">
+          {/* SVG overlay for chutes and ladders lines */}
+          <svg
+            viewBox="0 0 100 100"
+            className="absolute inset-0 w-full h-full pointer-events-none z-10"
+            style={{ overflow: 'visible' }}
+          >
+            {/* Ladders */}
+            {Object.entries(LADDERS).map(([fromStr, to]) => {
+              const from = Number(fromStr);
+              const start = squareCenter(from);
+              const end = squareCenter(to);
+              return (
+                <g key={`ladder-${from}`}>
+                  {/* Ladder rails */}
+                  <line
+                    x1={start.x - 1.2} y1={start.y} x2={end.x - 1.2} y2={end.y}
+                    stroke="hsl(160, 80%, 45%)" strokeWidth="0.8" opacity="0.8"
+                  />
+                  <line
+                    x1={start.x + 1.2} y1={start.y} x2={end.x + 1.2} y2={end.y}
+                    stroke="hsl(160, 80%, 45%)" strokeWidth="0.8" opacity="0.8"
+                  />
+                  {/* Rungs */}
+                  {Array.from({ length: 4 }).map((_, i) => {
+                    const t = (i + 1) / 5;
+                    const rx = start.x + (end.x - start.x) * t;
+                    const ry = start.y + (end.y - start.y) * t;
+                    return (
+                      <line key={i}
+                        x1={rx - 1.2} y1={ry} x2={rx + 1.2} y2={ry}
+                        stroke="hsl(160, 80%, 55%)" strokeWidth="0.5" opacity="0.7"
                       />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                    );
+                  })}
+                  {/* Start dot */}
+                  <circle cx={start.x} cy={start.y} r="1.5" fill="hsl(160, 80%, 50%)" />
+                  {/* End arrow dot */}
+                  <circle cx={end.x} cy={end.y} r="1.5" fill="hsl(160, 80%, 65%)" />
+                  {/* Label */}
+                  <text x={start.x} y={start.y + 3.5} textAnchor="middle" fontSize="2.2" fill="hsl(160, 80%, 60%)" fontWeight="bold">↑{to}</text>
+                </g>
+              );
+            })}
+            {/* Chutes (Snakes) */}
+            {Object.entries(CHUTES).map(([fromStr, to]) => {
+              const from = Number(fromStr);
+              const start = squareCenter(from);
+              const end = squareCenter(to);
+              // Create a curved snake path
+              const midX = (start.x + end.x) / 2 + (Math.random() > 0.5 ? 3 : -3);
+              const midY = (start.y + end.y) / 2;
+              return (
+                <g key={`chute-${from}`}>
+                  <path
+                    d={`M ${start.x} ${start.y} Q ${midX} ${midY} ${end.x} ${end.y}`}
+                    stroke="hsl(0, 72%, 55%)" strokeWidth="1.2" fill="none" opacity="0.7"
+                    strokeLinecap="round"
+                  />
+                  {/* Snake head at start */}
+                  <circle cx={start.x} cy={start.y} r="1.8" fill="hsl(0, 72%, 50%)" />
+                  <text x={start.x} y={start.y - 2} textAnchor="middle" fontSize="3" fill="hsl(0, 72%, 55%)">🐍</text>
+                  {/* Snake tail at end */}
+                  <circle cx={end.x} cy={end.y} r="1.2" fill="hsl(0, 72%, 45%)" />
+                  <text x={end.x} y={end.y + 3.5} textAnchor="middle" fontSize="2.2" fill="hsl(0, 72%, 55%)" fontWeight="bold">↓{to}</text>
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Grid */}
+          <div className="grid grid-cols-10 gap-0.5 w-full h-full">
+            {squares.map((num) => {
+              const isLadderStart = LADDERS[num] !== undefined;
+              const isLadderEnd = Object.values(LADDERS).includes(num);
+              const isChuteStart = CHUTES[num] !== undefined;
+              const isChuteEnd = Object.values(CHUTES).includes(num);
+              const playersHere = displayPositions.map((_, i) => i).filter(i => displayPositions[i] === num);
+
+              return (
+                <div
+                  key={num}
+                  className={`relative flex items-center justify-center text-[8px] md:text-xs rounded-sm border border-border ${
+                    isLadderStart ? 'bg-primary/25 border-primary/40'
+                    : isLadderEnd ? 'bg-primary/10 border-primary/30'
+                    : isChuteStart ? 'bg-destructive/25 border-destructive/40'
+                    : isChuteEnd ? 'bg-destructive/10 border-destructive/30'
+                    : 'bg-secondary'
+                  }`}
+                >
+                  <span className="text-muted-foreground font-mono">{num}</span>
+                  {isLadderStart && <span className="absolute top-0 left-0 text-[6px] md:text-[8px]">🪜</span>}
+                  {isChuteStart && <span className="absolute top-0 left-0 text-[6px] md:text-[8px]">🐍</span>}
+                  {playersHere.length > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center gap-0.5 z-20">
+                      {playersHere.map(pi => (
+                        <motion.div
+                          key={pi}
+                          layout
+                          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                          className={`w-2.5 h-2.5 md:w-3.5 md:h-3.5 rounded-full ${PLAYER_BG[pi % PLAYER_BG.length]} border border-background shadow-lg`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Controls */}
       <div className="flex items-center justify-center gap-6 mt-4 pb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap justify-center">
           {session?.players.map((p, i) => (
             <div key={p.id} className={`flex items-center gap-1 px-2 py-1 rounded ${i === currentPlayer ? 'bg-secondary ring-1 ring-primary' : ''}`}>
-              <div className={`w-3 h-3 rounded-full ${PLAYER_BG[i]}`} />
+              <div className={`w-3 h-3 rounded-full ${PLAYER_BG[i % PLAYER_BG.length]}`} />
               <span className="text-xs text-foreground">{p.name}: {positions[i]}</span>
             </div>
           ))}
         </div>
-        <Dice value={diceValue} rolling={rolling} onRoll={rollDice} disabled={winner !== null} />
+        <Dice value={diceValue} rolling={rolling} onRoll={rollDice} disabled={winner !== null || animating} />
       </div>
 
       {winner !== null && (
